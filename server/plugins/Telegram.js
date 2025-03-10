@@ -17,16 +17,19 @@ function run(trigger, scope, data, config, callback) {
             return callback();
         }
 
-        var notificationText = `*${data.agency} - ${data.alias}*\n` + 
-                                `Message: ${data.message}`;
+        var messageKey = data.message.slice(3);
 
-        if (sentMessages.has(data.message)) {
+        if (sentMessages.has(messageKey)) {
             logger.main.debug('Telegram: Dropping duplicate message: ' + data.message);
             return callback();
         }
 
-        sentMessages.add(data.message);
-        setTimeout(() => sentMessages.delete(data.message), 2 * 60 * 1000); 
+        sentMessages.add(messageKey);
+        setTimeout(() => sentMessages.delete(messageKey), 2 * 60 * 1000); // 2 minutes
+
+        // Use the full data.message for the notification
+        var notificationText = `*${data.agency} - ${data.alias}*\n` + 
+                                `Message: ${data.message}`;
 
         t.sendMessage({
             chat_id: tConf.chat,
