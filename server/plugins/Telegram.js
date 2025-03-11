@@ -7,6 +7,11 @@ const sentMessages = new Set();
 function run(trigger, scope, data, config, callback) {
     var tConf = data.pluginconf.Telegram;
     if (tConf && tConf.enable) {
+        if (!data.message || data.message.length < 7) {
+            logger.main.error('Telegram: ' + data.address + ' message is too short to process.');
+            return callback();
+        }
+        
         var telekey = config.teleAPIKEY;
         var t = new telegram({
             token: telekey
@@ -25,9 +30,8 @@ function run(trigger, scope, data, config, callback) {
         }
 
         sentMessages.add(messageKey);
-        setTimeout(() => sentMessages.delete(messageKey), 2 * 60 * 1000); // 2 minutes
+        setTimeout(() => sentMessages.delete(messageKey), 5 * 60 * 1000); 
 
-        // Use the full data.message for the notification
         var notificationText = `*${data.agency} - ${data.alias}*\n` + 
                                 `Message: ${data.message}`;
 
