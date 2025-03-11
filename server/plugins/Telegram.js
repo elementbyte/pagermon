@@ -8,7 +8,7 @@ function run(trigger, scope, data, config, callback) {
     var tConf = data.pluginconf.Telegram;
     if (tConf && tConf.enable) {
         if (!data.message || data.message.length < 7) {
-            logger.main.error('Telegram: ' + data.address + ' message is too short to process.');
+            logger.main.debug('Telegram: ' + data.address + ' message is too short to process.');
             return callback();
         }
         
@@ -18,7 +18,7 @@ function run(trigger, scope, data, config, callback) {
         });
 
         if (tConf.chat == 0 || !tConf.chat) {
-            logger.main.error('Telegram: ' + data.address + ' No ChatID key set. Please enter ChatID.');
+            logger.main.debug('Telegram: ' + data.address + ' No ChatID key set. Please enter ChatID.');
             return callback();
         }
 
