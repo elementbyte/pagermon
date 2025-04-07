@@ -7,9 +7,11 @@ const testMessages = [];
 let healthCheckTimerStarted = false;
 let healthCheckConfig = null;
 
-const HEALTH_CHECK_CHANNEL = '#all-pagers'; // All test summaries go here
+const HEALTH_CHECK_CHANNEL = '#all-pagers';
+const DUTY_OFFICERS_CHANNEL = '#seac-duty-officers';
+const DO_KEYWORDS = ['LGDO', 'MODO', 'STDO'];
 
-// Sends a health check summary to the all-pagers channel
+// Sends health check summary to the all-pagers channel
 function sendHealthCheck() {
     if (!healthCheckConfig) {
         logger.main.error('Health Check: Config not available.');
@@ -22,7 +24,6 @@ function sendHealthCheck() {
         ? `✅ *System health check:*\n\`\`\`\n${testMessages.length} pager test/s received in last 12 hours.\n\`\`\``
         : `❌ *System health check:*\n\`\`\`\nNO pager test/s received in last 12 hours.\n\`\`\``;
 
-    // Clear test messages list
     testMessages.length = 0;
 
     slackClient.chat.postMessage({
@@ -49,16 +50,12 @@ function run(trigger, scope, data, config, callback) {
             return callback();
         }
 
-        // Start health check timer only once
         if (!healthCheckTimerStarted) {
             healthCheckConfig = config;
-
-            // Send health check summary every 12 hours
             setInterval(sendHealthCheck, 12 * 60 * 60 * 1000);
             healthCheckTimerStarted = true;
         }
 
-        // Test message handling
         if (data.message.toLowerCase().includes("test")) {
             testMessages.push(data.message);
             logger.main.debug('Slack: Test message detected, added to health check list.');
@@ -67,7 +64,6 @@ function run(trigger, scope, data, config, callback) {
 
         const slackClient = new Slack({ token: config.bottoken });
 
-        // Deduplication: skip if message seen recently (ignoring first 3 characters)
         const messageKey = data.message.slice(3);
         if (sentMessages.has(messageKey)) {
             logger.main.debug('Slack: Dropping duplicate message: ' + data.message);
@@ -75,20 +71,35 @@ function run(trigger, scope, data, config, callback) {
         }
 
         sentMessages.add(messageKey);
-        setTimeout(() => sentMessages.delete(messageKey), 5 * 60 * 1000); // Expire after 5 minutes
+        setTimeout(() => sentMessages.delete(messageKey), 5 * 60 * 1000);
 
-        const messageData = `*${data.agency} - ${data.alias}*\n\`\`\`\n${data.message}\n\`\`\``;
+        const formattedMessage = `*${data.agency} - ${data.alias}*\n\`\`\`\n${data.message}\n\`\`\``;
 
-        slackClient.chat.postMessage({
-            channel: slConf.channel,
-            text: messageData
-        }).then((response) => {
-            logger.main.debug('Slack: ' + util.inspect(response, false, null));
-            callback();
-        }).catch((err) => {
-            logger.main.error('Slack: ' + err);
-            callback();
-        });
+        // Function to send message to any channel
+        const sendToChannel = (channel) => {
+            return slackClient.chat.postMessage({
+                channel: channel,
+                text: formattedMessage
+            });
+        };
+
+        // Always send to the configured channel
+        sendToChannel(slConf.channel)
+            .then((response) => {
+                logger.main.debug('Slack: ' + util.inspect(response, false, null));
+
+                // If the message contains any DO keywords, also send to the duty officers channel
+                const upperMessage = data.message.toUpperCase();
+                if (DO_KEYWORDS.some(keyword => upperMessage.includes(keyword))) {
+                    return sendToChannel(DUTY_OFFICERS_CHANNEL);
+                }
+            })
+            .then(() => callback())
+            .catch((err) => {
+                logger.main.error('Slack: ' + err);
+                callback();
+            });
+
     } else {
         callback();
     }
